@@ -1,0 +1,71 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DB_URL")
+}
+
+enum UserRole {
+  User
+  Admin
+}
+
+model User {
+  id            String    @id @default(uuid())
+  username      String    @db.VarChar(60)
+  email         String    @unique
+  password      String
+  isOnline      Boolean?  @default(false)
+  role          UserRole? @default(User)
+  refreshToken  String?
+  files         File[]
+  sections      Section[]
+  backups       Backup[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model File {
+  id          String    @id @default(uuid())
+  author      User      @relation(fields: [authorId], references: [id])
+  authorId    String 
+  filename    String  
+  path        String
+  section     String    
+  sectionId   String
+  text        String
+  metadata    String?
+  raw         String?
+  default     String? 
+  type        String?   @default("text/markdown")
+  public      Boolean?  @default(false)
+
+  @@unique([path, authorId])
+}
+
+model Section {
+  id        String    @id @default(uuid())
+  name      String  
+  author    User      @relation(fields: [authorId], references: [id])
+  authorId  String
+  public    Boolean?  @default(false)
+
+  @@unique([name, authorId])
+}
+
+model Backup {
+  id        Int      @id @default(autoincrement())
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  String
+  data      Json
+  createdAt DateTime @default(now())
+}
+
+model Key {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  createdAt DateTime @default(now())
+}
