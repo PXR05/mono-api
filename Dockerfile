@@ -7,10 +7,12 @@ COPY bun.lockb bun.lockb
 COPY ./src ./src
 COPY ./drizzle ./drizzle
 COPY drizzle.config.ts drizzle.config.ts
-# COPY start.sh start.sh
 
 RUN bun install
-RUN bun push
+
+RUN bun db:generate
+RUN bun db:migrate
+RUN bun db:seed
 
 ENV NODE_ENV=production
 
@@ -22,18 +24,15 @@ RUN bun build \
 --outfile server \
 ./src/index.ts
 
-# FROM oven/bun:slim
+FROM gcr.io/distroless/base
 
-# WORKDIR /app
+WORKDIR /app
 
-# COPY --from=build /app/server server
-# # COPY --from=build /app/mono.db mono.db
-# COPY --from=build /app/drizzle ./drizzle
-# COPY --from=build /app/drizzle.config.ts drizzle.config.ts
-# COPY --from=build /app/package.json package.json
+COPY --from=build /app/server server
+COPY --from=build /app/mono.db mono.db
 
-# ENV NODE_ENV=production
+ENV NODE_ENV=production
 
 CMD ["./server"]
 
-EXPOSE 3000 4000
+EXPOSE 3000
