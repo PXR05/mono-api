@@ -4,6 +4,8 @@ import { session, signIn, signUp } from "./auth.schema";
 import { getJwtTokens } from "./auth.utils";
 import { authService } from "./auth.service";
 import { responseSuccess } from "../utils";
+import { users } from "../../database/schema";
+import { eq } from "drizzle-orm";
 
 export const auth = new Elysia({ prefix: "/auth", tags: ["Auth"] })
   .use(authService)
@@ -39,15 +41,12 @@ export const auth = new Elysia({ prefix: "/auth", tags: ["Auth"] })
       accessToken.remove();
       refreshToken.remove();
 
-      await db.user.update({
-        where: {
-          id: user!.id,
-        },
-        data: {
+      await db.update(users)
+        .set({
           refreshToken: null,
           isOnline: false,
-        },
-      });
+        })
+        .where(eq(users.id, user!.id));
     },
     {
       cookie: t.Optional(session),
@@ -87,10 +86,14 @@ export const auth = new Elysia({ prefix: "/auth", tags: ["Auth"] })
         });
 
       const id = verfied.sub;
-      const user = await db.user.findUnique({
-        where: {
-          id,
-        },
+      if (!id) {
+        return error(401, {
+          success: false,
+          message: "Invalid token payload",
+        });
+      }
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, id),
       });
 
       if (!user)
@@ -106,14 +109,11 @@ export const auth = new Elysia({ prefix: "/auth", tags: ["Auth"] })
         refreshToken
       );
 
-      await db.user.update({
-        where: {
-          id: user.id,
-        },
-        data: {
+      await db.update(users)
+        .set({
           refreshToken: jwtRefresh,
-        },
-      });
+        })
+        .where(eq(users.id, user.id));
 
       return responseSuccess({
         success: true,
@@ -146,10 +146,8 @@ export const auth = new Elysia({ prefix: "/auth", tags: ["Auth"] })
     async ({ body, jwt, cookie: { accessToken, refreshToken }, error }) => {
       const { email, username, password } = body;
 
-      const exist = await db.user.findUnique({
-        where: {
-          email,
-        },
+      const exist = await db.query.users.findFirst({
+        where: eq(users.email, email),
       });
 
       if (exist)
@@ -159,13 +157,13 @@ export const auth = new Elysia({ prefix: "/auth", tags: ["Auth"] })
         });
 
       const hashed = await Bun.password.hash(password);
-      const user = await db.user.create({
-        data: {
+      const [user] = await db.insert(users)
+        .values({
           email,
           username,
           password: hashed,
-        },
-      });
+        })
+        .returning();
 
       const { jwtAccess, jwtRefresh } = await getJwtTokens(
         user,
@@ -174,15 +172,13 @@ export const auth = new Elysia({ prefix: "/auth", tags: ["Auth"] })
         refreshToken
       );
 
-      const updatedUser = await db.user.update({
-        where: {
-          id: user.id,
-        },
-        data: {
+      const [updatedUser] = await db.update(users)
+        .set({
           refreshToken: jwtRefresh,
           isOnline: true,
-        },
-      });
+        })
+        .where(eq(users.id, user.id))
+        .returning();
 
       return responseSuccess({
         success: true,
@@ -217,10 +213,8 @@ export const auth = new Elysia({ prefix: "/auth", tags: ["Auth"] })
           message: "Missing email or password",
         });
 
-      const user = await db.user.findUnique({
-        where: {
-          email: body.email,
-        },
+      const user = await db.query.users.findFirst({
+        where: eq(users.email, body.email),
       });
 
       if (!user)
@@ -245,15 +239,13 @@ export const auth = new Elysia({ prefix: "/auth", tags: ["Auth"] })
         refreshToken
       );
 
-      const updatedUser = await db.user.update({
-        where: {
-          id: user.id,
-        },
-        data: {
+      const [updatedUser] = await db.update(users)
+        .set({
           refreshToken: jwtRefresh,
           isOnline: true,
-        },
-      });
+        })
+        .where(eq(users.id, user.id))
+        .returning();
 
       return responseSuccess({
         success: true,

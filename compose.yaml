@@ -1,41 +1,18 @@
 services:
-  db:
-    container_name: postgres
-    image: postgres:alpine
-    restart: always
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: mono
-    ports:
-      - 5432:5432
-    volumes:
-      - pg_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -d postgres -U postgres"]
-      interval: 1s
-      timeout: 5s
-      retries: 10
-
   app:
     container_name: mono
     build:
       context: .
       dockerfile: Dockerfile
-    restart: always
+    restart: on-failure
     environment:
       JWT_SECRET: ${JWT_SECRET}
       DEFAULT_API_KEY: ${DEFAULT_API_KEY}
-      DB_URL: postgres://postgres:${DB_PASSWORD}@db:5432/mono
     ports:
       - 3000:3000
+      - 4000:4000
     volumes:
-      - mono_data:/home/bun/app
-    depends_on:
-      db:
-        condition: service_healthy
+      - data:/home/bun/app
 
 volumes:
-  mono_data:
-  pg_data:
-  pgadmin_data:
+  data:

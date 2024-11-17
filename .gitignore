@@ -13,6 +13,7 @@
 
 # production
 /build
+/drizzle
 
 # misc
 .DS_Store
@@ -38,7 +39,7 @@ yarn-error.log*
 **/*.tar.gz
 **/*.tgz
 **/*.log
+**/*.db
+**/*.sqlite
 package-lock.json
 **/*.bun
-
-pg_data

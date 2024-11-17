@@ -3,6 +3,8 @@ import { db } from "../../database/connection";
 import { responseSuccess } from "../utils";
 import { authService } from "../auth/auth.service";
 import { profile } from "./user.schema";
+import { users } from "../../database/schema";
+import { eq } from "drizzle-orm";
 
 export const user = new Elysia({ prefix: "/user", tags: ["User"] })
   .use(authService)
@@ -12,12 +14,12 @@ export const user = new Elysia({ prefix: "/user", tags: ["User"] })
   .get(
     "/",
     async () => {
-      const users = await db.user.findMany();
+      const userList = await db.query.users.findMany();
       return responseSuccess({
         success: true,
         message: "Users found",
         data: {
-          users,
+          users: userList,
         },
       });
     },
@@ -38,10 +40,8 @@ export const user = new Elysia({ prefix: "/user", tags: ["User"] })
   .get(
     "/:id",
     async ({ params: { id }, error }) => {
-      const user = await db.user.findUnique({
-        where: {
-          id,
-        },
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, id),
       });
 
       if (!user)
@@ -75,10 +75,8 @@ export const user = new Elysia({ prefix: "/user", tags: ["User"] })
   .patch(
     "/:id",
     async ({ params: { id }, body, error }) => {
-      const user = await db.user.findUnique({
-        where: {
-          id,
-        },
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, id),
       });
 
       if (!user)
@@ -87,18 +85,16 @@ export const user = new Elysia({ prefix: "/user", tags: ["User"] })
           message: "User not found",
         });
 
-      await db.user.update({
-        where: {
-          id,
-        },
-        data: {
-          ...body,
-        },
-      });
+      const [updated] = await db
+        .update(users)
+        .set(body)
+        .where(eq(users.id, id))
+        .returning();
 
       return responseSuccess({
         success: true,
         message: "User updated",
+        data: updated,
       });
     },
     {

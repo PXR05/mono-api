@@ -3,6 +3,8 @@ import { db } from "../../database/connection";
 import { monoSection } from "./section.schema";
 import { authService } from "../auth/auth.service";
 import { responseSuccess } from "../utils";
+import { sections, files } from "../../database/schema";
+import { and, eq, or } from "drizzle-orm";
 
 export const section = new Elysia({ prefix: "/section", tags: ["Section"] })
   .use(authService)
@@ -16,24 +18,23 @@ export const section = new Elysia({ prefix: "/section", tags: ["Section"] })
   .get(
     "/",
     async ({ user }) => {
-      let sections;
+      let sectionList;
       if (user) {
-        sections = await db.section.findMany({
-          where: {
-            OR: [{ authorId: user.id }, { public: true }],
-          },
+        sectionList = await db.query.sections.findMany({
+          where: or(
+            eq(sections.authorId, user.id),
+            eq(sections.public, true)
+          ),
         });
       } else {
-        sections = await db.section.findMany({
-          where: {
-            public: true,
-          },
+        sectionList = await db.query.sections.findMany({
+          where: eq(sections.public, true),
         });
       }
       return responseSuccess({
         success: true,
         message: "Sections found",
-        data: sections,
+        data: sectionList,
       });
     },
     {
@@ -50,11 +51,14 @@ export const section = new Elysia({ prefix: "/section", tags: ["Section"] })
   .get(
     "/:id/files",
     async ({ params: { id }, user, error }) => {
-      const section = await db.section.findUnique({
-        where: {
-          id,
-          OR: [{ authorId: user!.id }, { public: true }],
-        },
+      const section = await db.query.sections.findFirst({
+        where: and(
+          eq(sections.id, id),
+          or(
+            eq(sections.authorId, user!.id),
+            eq(sections.public, true)
+          )
+        ),
       });
       if (!section) {
         return error(404, {
@@ -62,8 +66,9 @@ export const section = new Elysia({ prefix: "/section", tags: ["Section"] })
           message: "Section not found",
         });
       }
-      const files = await db.file.findMany({
-        select: {
+      const fileList = await db.query.files.findMany({
+        where: eq(files.sectionId, section.id),
+        columns: {
           id: true,
           authorId: true,
           filename: true,
@@ -72,14 +77,11 @@ export const section = new Elysia({ prefix: "/section", tags: ["Section"] })
           type: true,
           default: true,
         },
-        where: {
-          sectionId: section.id,
-        },
       });
       return responseSuccess({
         success: true,
         message: "Files found",
-        data: files,
+        data: fileList,
       });
     },
     {
@@ -105,15 +107,13 @@ export const section = new Elysia({ prefix: "/section", tags: ["Section"] })
   .get(
     "/self",
     async ({ user }) => {
-      const sections = await db.section.findMany({
-        where: {
-          authorId: user!.id,
-        },
+      const sectionList = await db.query.sections.findMany({
+        where: eq(sections.authorId, user!.id),
       });
       return responseSuccess({
         success: true,
         message: "Sections found",
-        data: sections,
+        data: sectionList,
       });
     },
     {
@@ -130,13 +130,11 @@ export const section = new Elysia({ prefix: "/section", tags: ["Section"] })
   .put(
     "/",
     async ({ body, user, error }) => {
-      const exists = await db.section.findUnique({
-        where: {
-          name_authorId: {
-            name: body.name,
-            authorId: user!.id,
-          },
-        },
+      const exists = await db.query.sections.findFirst({
+        where: and(
+          eq(sections.name, body.name),
+          eq(sections.authorId, user!.id)
+        ),
       });
       if (exists) {
         return error(409, {
@@ -144,12 +142,12 @@ export const section = new Elysia({ prefix: "/section", tags: ["Section"] })
           message: "Section already exists",
         });
       }
-      const section = await db.section.create({
-        data: {
+      const [section] = await db.insert(sections)
+        .values({
           ...body,
           authorId: user!.id,
-        },
-      });
+        })
+        .returning();
       return responseSuccess({
         success: true,
         message: "Section created",
@@ -179,15 +177,13 @@ export const section = new Elysia({ prefix: "/section", tags: ["Section"] })
   .patch(
     "/:name",
     async ({ body, params: { name }, user, error }) => {
-      const section = await db.section.update({
-        where: {
-          name_authorId: {
-            name,
-            authorId: user!.id,
-          },
-        },
-        data: body,
-      });
+      const [section] = await db.update(sections)
+        .set(body)
+        .where(and(
+          eq(sections.name, name),
+          eq(sections.authorId, user!.id)
+        ))
+        .returning();
 
       if (!section)
         return error(404, {
@@ -219,14 +215,12 @@ export const section = new Elysia({ prefix: "/section", tags: ["Section"] })
   .delete(
     "/:name",
     async ({ params: { name }, user, error }) => {
-      const section = await db.section.delete({
-        where: {
-          name_authorId: {
-            name,
-            authorId: user!.id,
-          },
-        },
-      });
+      const [section] = await db.delete(sections)
+        .where(and(
+          eq(sections.name, name),
+          eq(sections.authorId, user!.id)
+        ))
+        .returning();
 
       if (!section)
         return error(404, {

@@ -1,3 +1,6 @@
-import { PrismaClient } from "@prisma/client";
+import Database from "bun:sqlite";
+import { drizzle } from "drizzle-orm/bun-sqlite";
+import * as schema from "./schema";
 
-export const db = new PrismaClient();
+const sqlite = new Database("mono.db");
+export const db = drizzle({ client: sqlite, schema });

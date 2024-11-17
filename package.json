@@ -4,13 +4,11 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "bun run --watch src/index.ts",
-    "migrate": "prisma migrate dev",
-    "seed": "prisma db seed",
-    "generate": "prisma generate"
-  },
-  "prisma": {
-    "seed": "ts-node src/database/seed.ts",
-    "schema": "src/database/schema.prisma"
+    "db:generate": "bunx drizzle-kit generate",
+    "db:migrate": "bunx drizzle-kit migrate",
+    "db:seed": "bun run src/database/seed.ts",
+    "db:studio": "bunx drizzle-kit studio --port 4000",
+    "db:push": "bunx drizzle-kit push && bun run seed"
   },
   "dependencies": {
     "@elysiajs/bearer": "^1.1.2",
@@ -18,16 +16,20 @@
     "@elysiajs/jwt": "^1.1.1",
     "@elysiajs/opentelemetry": "^1.1.6",
     "@elysiajs/swagger": "^1.1.5",
+    "@libsql/client": "^0.14.0",
     "@prisma/client": "^5.20.0",
-    "elysia": "latest",
-    "elysia-compress": "^1.2.1"
+    "drizzle-orm": "^0.36.3",
+    "drizzle-typebox": "^0.1.1",
+    "elysia": "latest"
   },
   "devDependencies": {
-    "bun-types": "latest",
-    "prisma": "^5.20.0"
+    "drizzle-kit": "^0.28.1"
   },
   "module": "src/index.js",
   "bun-create": {
     "start": "bun run src/index.ts"
+  },
+  "override": {
+    "@sinclair/typebox": "0.32.4"
   }
 }

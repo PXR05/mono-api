@@ -1,36 +1,39 @@
-FROM oven/bun AS build
+FROM oven/bun:slim AS build
 
 WORKDIR /app
 
 COPY package.json package.json
 COPY bun.lockb bun.lockb
 COPY ./src ./src
-COPY start.sh start.sh
+COPY ./drizzle ./drizzle
+COPY drizzle.config.ts drizzle.config.ts
+# COPY start.sh start.sh
 
 RUN bun install
-RUN bunx prisma generate
+RUN bun push
 
 ENV NODE_ENV=production
 
 RUN bun build \
-	--compile \
-	--minify-whitespace \
-	--minify-syntax \
-	--target bun \
-	--outfile server \
-	./src/index.ts
+--compile \
+--minify-whitespace \
+--minify-syntax \
+--target bun \
+--outfile server \
+./src/index.ts
 
-FROM oven/bun:slim
+# FROM oven/bun:slim
 
-WORKDIR /app
+# WORKDIR /app
 
-COPY --from=build /app/start.sh start.sh
-COPY --from=build /app/src/database/schema.prisma src/database/schema.prisma
-COPY --from=build /app/server server
-COPY --from=build /app/node_modules/.prisma node_modules/.prisma
+# COPY --from=build /app/server server
+# # COPY --from=build /app/mono.db mono.db
+# COPY --from=build /app/drizzle ./drizzle
+# COPY --from=build /app/drizzle.config.ts drizzle.config.ts
+# COPY --from=build /app/package.json package.json
 
-ENV NODE_ENV=production
+# ENV NODE_ENV=production
 
-CMD ["./start.sh"]
+CMD ["./server"]
 
-EXPOSE 3000
+EXPOSE 3000 4000

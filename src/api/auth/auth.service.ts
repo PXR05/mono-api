@@ -1,6 +1,8 @@
 import jwt from "@elysiajs/jwt";
-import Elysia from "elysia";
+import Elysia, { error } from "elysia";
 import { db } from "../../database/connection";
+import { users } from "../../database/schema";
+import { eq } from "drizzle-orm";
 
 export const authService = new Elysia({ name: "auth/service" })
   .use(
@@ -17,10 +19,9 @@ export const authService = new Elysia({ name: "auth/service" })
     if (!verfied) return;
 
     const id = verfied.sub;
-    const user = await db.user.findUnique({
-      where: {
-        id,
-      },
+    if (!id) return;
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, id),
     });
 
     if (!user) return;

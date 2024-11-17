@@ -8,19 +8,14 @@ import { auth } from "./api/auth/auth.controller";
 import { file } from "./api/file/file.controller";
 import { section } from "./api/section/section.controller";
 import { user } from "./api/user/user.controller";
-import bearer from "@elysiajs/bearer";
-import { db } from "./database/connection";
 import { share } from "./api/share/share.controller";
-import compression from "elysia-compress";
+import { db } from "./database/connection";
+import { eq } from "drizzle-orm";
+import { keys } from "./database/schema";
+import bearer from "@elysiajs/bearer";
 
 const app = new Elysia({ name: "mono" })
   .use(cors())
-  .use(
-    compression({
-      encodings: ["gzip", "deflate"],
-      as: "global",
-    })
-  )
   .use(
     opentelemetry({
       spanProcessors: [
@@ -37,7 +32,6 @@ const app = new Elysia({ name: "mono" })
     })
   )
   .onError(({ error, code }) => {
-    console.log(error);
     switch (code) {
       case "NOT_FOUND":
         return {
@@ -76,6 +70,7 @@ const app = new Elysia({ name: "mono" })
           errors: error,
         };
       default:
+        console.log(error);
         return {
           success: false,
           message: "Unknown error",
@@ -118,17 +113,8 @@ const app = new Elysia({ name: "mono" })
   .guard({
     async beforeHandle({ bearer, error }) {
       if (!bearer) return error(401, "Unauthorized");
-      const empty = await db.key.findFirst();
-      if (!empty)
-        await db.key.create({
-          data: {
-            key: Bun.env.DEFAULT_API_KEY!,
-          },
-        });
-      const exist = await db.key.findUnique({
-        where: {
-          key: bearer,
-        },
+      const exist = await db.query.keys.findFirst({
+        where: eq(keys.key, bearer),
       });
       if (!exist) return error(401, "Unauthorized");
       return;

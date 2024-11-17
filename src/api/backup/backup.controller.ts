@@ -2,6 +2,8 @@ import Elysia, { t } from "elysia";
 import { db } from "../../database/connection";
 import { authService } from "../auth/auth.service";
 import { responseSuccess } from "../utils";
+import { backups } from "../../database/schema";
+import { eq } from "drizzle-orm";
 
 export const backup = new Elysia({ prefix: "/backup", tags: ["Backup"] })
   .use(authService)
@@ -15,15 +17,13 @@ export const backup = new Elysia({ prefix: "/backup", tags: ["Backup"] })
   .get(
     "/",
     async ({ user }) => {
-      const backups = await db.backup.findMany({
-        where: {
-          authorId: user!.id,
-        },
+      const backupList = await db.query.backups.findMany({
+        where: eq(backups.authorId, user!.id),
       });
       return responseSuccess({
         success: true,
         message: "Backups found",
-        data: backups,
+        data: backupList,
       });
     },
     {
@@ -41,12 +41,10 @@ export const backup = new Elysia({ prefix: "/backup", tags: ["Backup"] })
   .get(
     "/user/:userId",
     async ({ params: { userId }, error }) => {
-      const backups = await db.backup.findMany({
-        where: {
-          authorId: userId,
-        },
+      const backupList = await db.query.backups.findMany({
+        where: eq(backups.authorId, userId),
       });
-      if (backups.length === 0) {
+      if (backupList.length === 0) {
         return error(404, {
           success: false,
           message: "No backups found for this user",
@@ -55,7 +53,7 @@ export const backup = new Elysia({ prefix: "/backup", tags: ["Backup"] })
       return responseSuccess({
         success: true,
         message: "Backups found",
-        data: backups,
+        data: backupList,
       });
     },
     {
@@ -76,10 +74,8 @@ export const backup = new Elysia({ prefix: "/backup", tags: ["Backup"] })
   .get(
     "/:id",
     async ({ params: { id }, error }) => {
-      const backup = await db.backup.findUnique({
-        where: {
-          id: parseInt(id),
-        },
+      const backup = await db.query.backups.findFirst({
+        where: eq(backups.id, parseInt(id)),
       });
       if (!backup) {
         return error(404, {
@@ -111,12 +107,12 @@ export const backup = new Elysia({ prefix: "/backup", tags: ["Backup"] })
   .put(
     "/",
     async ({ body, user }) => {
-      const newBackup = await db.backup.create({
-        data: {
+      const [newBackup] = await db.insert(backups)
+        .values({
           ...body,
           authorId: user!.id,
-        },
-      });
+        })
+        .returning();
       return responseSuccess({
         success: true,
         message: "Backup created",
@@ -141,10 +137,8 @@ export const backup = new Elysia({ prefix: "/backup", tags: ["Backup"] })
   .delete(
     "/:id",
     async ({ params: { id }, user, error }) => {
-      const backup = await db.backup.findUnique({
-        where: {
-          id: parseInt(id),
-        },
+      const backup = await db.query.backups.findFirst({
+        where: eq(backups.id, parseInt(id)),
       });
 
       if (!backup) {
@@ -161,11 +155,8 @@ export const backup = new Elysia({ prefix: "/backup", tags: ["Backup"] })
         });
       }
 
-      await db.backup.delete({
-        where: {
-          id: parseInt(id),
-        },
-      });
+      await db.delete(backups)
+        .where(eq(backups.id, parseInt(id)));
 
       return responseSuccess({
         success: true,

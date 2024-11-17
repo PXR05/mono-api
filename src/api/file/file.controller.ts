@@ -3,6 +3,8 @@ import { db } from "../../database/connection";
 import { monoFile } from "./file.schema";
 import { authService } from "../auth/auth.service";
 import { responseSuccess } from "../utils";
+import { files, sections } from "../../database/schema";
+import { and, eq, or } from "drizzle-orm";
 
 export const file = new Elysia({ prefix: "/file", tags: ["File"] })
   .use(authService)
@@ -16,25 +18,21 @@ export const file = new Elysia({ prefix: "/file", tags: ["File"] })
   .get(
     "/",
     async ({ user }) => {
-      let files;
+      let fileList;
       if (user) {
-        files = await db.file.findMany({
-          where: {
-            OR: [{ authorId: user.id }, { public: true }],
-          },
+        fileList = await db.query.files.findMany({
+          where: or(eq(files.authorId, user.id), eq(files.public, true)),
         });
       } else {
-        files = await db.file.findMany({
-          where: {
-            public: true,
-          },
+        fileList = await db.query.files.findMany({
+          where: eq(files.public, true),
         });
       }
 
       return responseSuccess({
         success: true,
         message: "Files found",
-        data: files,
+        data: fileList,
       });
     },
     {
@@ -51,31 +49,26 @@ export const file = new Elysia({ prefix: "/file", tags: ["File"] })
   .put(
     "/",
     async ({ body, user, error }) => {
-      let section = await db.section.findUnique({
-        where: {
-          name_authorId: {
-            name: body.section,
-            authorId: user!.id,
-          },
-        },
+      let section = await db.query.sections.findFirst({
+        where: and(
+          eq(sections.name, body.section),
+          eq(sections.authorId, user!.id)
+        ),
       });
+
       if (!section) {
-        section = await db.section.create({
-          data: {
+        const [newSection] = await db
+          .insert(sections)
+          .values({
             name: body.section,
-            author: {
-              connect: { id: user!.id },
-            },
-          },
-        });
-      }
-      const exists = await db.file.findUnique({
-        where: {
-          path_authorId: {
-            path: body.path,
             authorId: user!.id,
-          },
-        },
+          })
+          .returning();
+        section = newSection;
+      }
+
+      const exists = await db.query.files.findFirst({
+        where: and(eq(files.path, body.path), eq(files.authorId, user!.id)),
       });
       if (exists) {
         return error(409, {
@@ -84,15 +77,14 @@ export const file = new Elysia({ prefix: "/file", tags: ["File"] })
           data: exists,
         });
       }
-      const file = await db.file.create({
-        data: {
+      const [file] = await db
+        .insert(files)
+        .values({
           ...body,
           sectionId: section.id,
-          author: {
-            connect: { id: user!.id },
-          },
-        },
-      });
+          authorId: user!.id,
+        })
+        .returning();
       return responseSuccess({
         success: true,
         message: "File created",
@@ -125,18 +117,15 @@ export const file = new Elysia({ prefix: "/file", tags: ["File"] })
     async ({ params: { id }, user }) => {
       let file;
       if (user) {
-        file = await db.file.findFirst({
-          where: {
-            id,
-            OR: [{ authorId: user.id }, { public: true }],
-          },
+        file = await db.query.files.findFirst({
+          where: and(
+            eq(files.id, id),
+            or(eq(files.authorId, user.id), eq(files.public, true))
+          ),
         });
       } else {
-        file = await db.file.findFirst({
-          where: {
-            id,
-            public: true,
-          },
+        file = await db.query.files.findFirst({
+          where: and(eq(files.id, id), eq(files.public, true)),
         });
       }
 
@@ -172,11 +161,8 @@ export const file = new Elysia({ prefix: "/file", tags: ["File"] })
   .post(
     "/unshare/:id",
     async ({ params: { id }, user, error }) => {
-      const file = await db.file.findUnique({
-        where: {
-          id,
-          authorId: user!.id,
-        },
+      const file = await db.query.files.findFirst({
+        where: and(eq(files.id, id), eq(files.authorId, user!.id)),
       });
       if (!file) {
         return error(404, {
@@ -191,14 +177,12 @@ export const file = new Elysia({ prefix: "/file", tags: ["File"] })
           data: file,
         });
       }
-      const unshared = await db.file.update({
-        where: {
-          id,
-        },
-        data: {
-          public: false,
-        },
-      });
+      const [unshared] = await db
+        .update(files)
+        .set({ public: false })
+        .where(eq(files.id, id))
+        .returning();
+
       return responseSuccess({
         success: true,
         message: "File unshared",
@@ -222,11 +206,8 @@ export const file = new Elysia({ prefix: "/file", tags: ["File"] })
   .patch(
     "/:id",
     async ({ params: { id }, body, user }) => {
-      const exists = await db.file.findUnique({
-        where: {
-          id,
-          authorId: user!.id,
-        },
+      const exists = await db.query.files.findFirst({
+        where: and(eq(files.id, id), eq(files.authorId, user!.id)),
       });
       if (!exists) {
         return error(404, {
@@ -234,13 +215,12 @@ export const file = new Elysia({ prefix: "/file", tags: ["File"] })
           message: "File not found",
         });
       }
-      const file = await db.file.update({
-        where: {
-          id,
-          authorId: user!.id,
-        },
-        data: body,
-      });
+      const [file] = await db
+        .update(files)
+        .set(body)
+        .where(and(eq(files.id, id), eq(files.authorId, user!.id)))
+        .returning();
+
       return responseSuccess({
         success: true,
         message: "File updated",
@@ -265,12 +245,11 @@ export const file = new Elysia({ prefix: "/file", tags: ["File"] })
   .delete(
     "/:id",
     async ({ params: { id }, user }) => {
-      const file = await db.file.delete({
-        where: {
-          id,
-          authorId: user!.id,
-        },
-      });
+      const [file] = await db
+        .delete(files)
+        .where(and(eq(files.id, id), eq(files.authorId, user!.id)))
+        .returning();
+
       if (!file) {
         return error(404, {
           success: false,
