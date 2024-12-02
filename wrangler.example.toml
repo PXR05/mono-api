@@ -1,0 +1,19 @@
+# :schema node_modules/wrangler/config-schema.json
+name = "mono"
+main = "./src/index.ts"
+compatibility_date = "2023-05-18"
+node_compat = true
+
+[vars]
+JWT_SECRET = ""
+DEFAULT_API_KEY = ""
+AXIOM_TOKEN = ""
+AXIOM_DATASET = ""
+CF_TOKEN = ""
+ACCOUNT_ID = ""
+DB_ID = ""
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mono"
+database_id = ""

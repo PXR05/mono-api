@@ -41,5 +41,8 @@ yarn-error.log*
 **/*.log
 **/*.db
 **/*.sqlite
-package-lock.json
 **/*.bun
+
+package-lock.json
+bun.lockb
+wrangler.toml

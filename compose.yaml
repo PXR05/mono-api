@@ -8,9 +8,10 @@ services:
     environment:
       JWT_SECRET: ${JWT_SECRET}
       DEFAULT_API_KEY: ${DEFAULT_API_KEY}
+      AXIOM_TOKEN: ${AXIOM_TOKEN}
+      AXIOM_DATASET: ${AXIOM_DATASET}
     ports:
       - 3000:3000
-      - 4000:4000
     volumes:
       - data:/home/bun/app
 
